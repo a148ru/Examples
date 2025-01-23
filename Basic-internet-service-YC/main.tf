@@ -1,4 +1,3 @@
-# основная сеть и подсети
 resource "yandex_vpc_network" "network" {
   name = var.vpc_name
 }
@@ -8,11 +7,10 @@ resource "yandex_vpc_subnet" "network" {
   zone           = "${each.value}"
   network_id     = yandex_vpc_network.network.id
   v4_cidr_blocks = var.network_cidr["${each.key}"]
-# Вызовет цикл
+# Вызывает цикл
 # Error: Cycle: yandex_compute_instance.ipsec-instance, yandex_vpc_route_table.vpn-route, yandex_vpc_subnet.network
 #  route_table_id = yandex_vpc_route_table.vpn-route.id
 }
-# удалеенная сеть и подсеть для тестовой вм
 resource "yandex_vpc_network" "remote-net" {
   name = "remote-net"
 }
@@ -31,7 +29,6 @@ data "yandex_compute_image" "drupal" {
 data "yandex_compute_image" "ipsec-instance" {
   family = "ipsec-instance-ubuntu"
 }
-# удаленная вм
 resource "yandex_compute_disk" "remote-wm-disk" {
   name     = "remote-wm-disk"
   type     = "network-hdd"
@@ -49,21 +46,16 @@ resource "yandex_compute_instance" "remote-vm" {
     memory = "4"
 
   }
-
-    scheduling_policy {
+  scheduling_policy {
     preemptible = true
   }
-
   boot_disk {
     disk_id = yandex_compute_disk.remote-wm-disk.id
   }
-
   network_interface {
     subnet_id = yandex_vpc_subnet.remote-net.id
     nat       = true
-  #  security_group_ids = [yandex_vpc_security_group.test-backup-sg.id]
   }
-
   metadata = {
     ssh-keys = "linux:${local.vms_ssh_root_key}"
   }
@@ -73,7 +65,6 @@ resource "yandex_vpc_security_group" "vpn-sg" {
   description = "Description for security group"
   network_id  = yandex_vpc_network.network.id
   depends_on  = [ yandex_compute_instance.remote-vm,]
-
   ingress {
     protocol       = "UDP"
     description    = "udp500"
@@ -148,25 +139,20 @@ resource "yandex_compute_instance" "web-node" {
   resources {
     cores  = "2"
     memory = "4"
-
   }
-
   scheduling_policy {
     preemptible = true
   }
-
   boot_disk {
     initialize_params {
       image_id = data.yandex_compute_image.drupal.id
     }
   }
-
   network_interface {
     subnet_id = yandex_vpc_subnet.network[each.key].id
     nat       = false
     security_group_ids = [yandex_vpc_security_group.web-service-sg.id]
   }
-
   metadata = {
     ssh-keys = "linux:${local.vms_ssh_root_key}"
   }
@@ -179,25 +165,20 @@ resource "yandex_compute_instance" "ipsec-instance" {
   resources {
     cores  = "2"
     memory = "4"
-
   }
-
   scheduling_policy {
     preemptible = true
   }
-
   boot_disk {
     initialize_params {
       image_id = data.yandex_compute_image.ipsec-instance.id
     }
   }
-
   network_interface {
     subnet_id = yandex_vpc_subnet.network["a"].id
     nat       = true
     security_group_ids = [yandex_vpc_security_group.vpn-sg.id]
   }
-
   metadata = {
     ssh-keys = "linux:${local.vms_ssh_root_key}"
   }
@@ -210,11 +191,9 @@ resource "yandex_vpc_route_table" "vpn-route" {
     next_hop_address   = yandex_compute_instance.ipsec-instance.network_interface[0].ip_address
   }
 }
-
 resource "yandex_lb_target_group" "web-tg" {
   name      = "web-tg"
   region_id = "ru-central1"
-
   target {
     subnet_id = yandex_vpc_subnet.network["a"].id
     address   = yandex_compute_instance.web-node["a"].network_interface.0.ip_address
@@ -228,10 +207,8 @@ resource "yandex_lb_target_group" "web-tg" {
     address   = yandex_compute_instance.web-node["d"].network_interface.0.ip_address
   }
 }
-
 resource "yandex_lb_network_load_balancer" "web-lb" {
   name = "web-lb"
-
   listener {
     name = "web-listener"
     port = 80
@@ -239,10 +216,8 @@ resource "yandex_lb_network_load_balancer" "web-lb" {
       ip_version = "ipv4"
     }
   }
-
   attached_target_group {
     target_group_id = yandex_lb_target_group.web-tg.id
-
     healthcheck {
       name = "tcp"
       tcp_options {
